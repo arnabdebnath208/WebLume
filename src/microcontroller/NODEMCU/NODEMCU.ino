@@ -16,44 +16,48 @@ const char *OTA_HOSTNAME = "WebLume"; //OTA HOSTNAME
 const char *OTA_PASSWORD = "password";  //OTA PASSWORD
 const String WEBSERVER_API_URL = "http://192.168.0.0:8012/api.php"; //Here will be your web api url
 // webapi is used to get the pin state and sync the pin state with the server
+bool SIPO_REGISTER_MODE = false; //This is used to tell that the nodemcu is using the SIPO register(Ex- 74HC595 ic) or not
 
-bool SIPO_REGISTER_MODE = false; //This is used to tell that the nodemcu is using the SIPO register or not
 bool SYNC_MODE = true; //This is used to tell that the nodemcu is using the sync fetures or not
-bool SYNC_STATE = false;
-bool SYNC_FIRST = false;
-bool NO_WIFI_MODE=false; 
-bool WIFI_SLEEP = false;
-bool WIFI_STATE = false;
-bool OTA_INS = false;
-bool OTA_FIRST = false;
-int syncFailedCount = 0;
-int SYNC_FAILED_LIMIT = 50;
+bool SYNC_STATE = false; //This is used to tell that the nodemcu and server is synced or not
+bool SYNC_FIRST = false; //This is used to tell that the nodemcu is synced with the server for the first time or not
+bool NO_WIFI_MODE=false;  
+bool WIFI_SLEEP = false; //This is used to tell that the wifi is in sleep mode or not
+bool WIFI_STATE = false; //This is used to tell that the wifi is connected or not
+bool OTA_INS = false; //This is used to tell if OTA mode is on or not
+bool OTA_FIRST = false; //This is used to tell that the OTA is started for the first time or not
+int syncFailedCount = 0; //This is used to count the failed sync state
+int SYNC_FAILED_LIMIT = 50; //This is used to tell the limit of failed sync state
 
 bool HTTP_ERROR = false; //This is used to tell that the http request is failed or not
 
 
 //Mode Fetures
+//Debug mode is used to send the debug message to the server through the http request
+//if debug mode is on the the println function will send the message to the server
 bool DEBUG_MODE = false;
-bool SERIAL_PRINT = false;
+bool SERIAL_PRINT = false; //If you turn on this mode then it will print the debug message in the serial monitor if the debug mode is off
 
 //PIN Description
-const int latchPin = D3;  // Connect to the 74HC595 pin 12 (Latch) if SIPO_REGISTER_MODE is true
-const int clockPin = D5;  // Connect to the 74HC595 pin 11 (Clock) if SIPO_REGISTER_MODE is true
-const int dataPin = D6;   // Connect to the 74HC595 pin 14 (Data) if SIPO_REGISTER_MODE is true
+//The latchPin,clockPin and dataPin are used if you turn on(true) the SIPO_REGISTER_MODE.
+const int latchPin = D3;  // Connect to the SIPO register Latch pin [Ex- 12 no pin for 74HC595] if SIPO_REGISTER_MODE is true
+const int clockPin = D5;  // Connect to the SIPO register Clock pin [Ex- 11 no pin for 74HC595] if SIPO_REGISTER_MODE is true
+const int dataPin = D6;   // Connect to the SIPO register Data pin [Ex- 14 no pin for 74HC595] if SIPO_REGISTER_MODE is true
 const int irReciverPin = D7; //Connect to the IR reciver signal pin
 const int indicatorPin = D8; //Connect to the indicator led +ve pin
+//The maskedPins are used if you turn off(false) the SIPO_REGISTER_MODE. It will use you nodemcu pins as the output pins. -1 means the it will be skipped if any command received for that pin
 const int maskedPins[] = { D1, D2, D3, D5, D6, -1, -1, -1}; //will be use if SIPO_REGISTER_MODE is false
 // --------------
 
-bool PIN_STATES[] = { false, false, false, false, false, false, false, false};
-const int PIN_COUNT = 8;
+bool PIN_STATES[] = { false, false, false, false, false, false, false, false}; //The current state of the pins
+const int PIN_COUNT = 8; //This is the number of pins of SIPO Register(Ex- 74HC595 ic) or the number of pins of the nodemcu
 
 
 ESP8266WebServer server(80); // This is used for the WebServer
 IRrecv irrecv(irReciverPin);     // This is used for IR reciver
 decode_results results;      // This is used for IR reciver
 
-String getPinStateCodes()
+String getPinStateCodes() //This function is used to get the pin state as a string of 1 and 0. 1 means the pin is high and 0 means the pin is low
 {
   String response="";
   for(int i=0;i<PIN_COUNT;i++)
@@ -66,7 +70,7 @@ String getPinStateCodes()
   return response;
 }
 
-void println(String text)
+void println(String text) //This function is used for print the text in the serial monitor or send the text to the server
 {
   if (DEBUG_MODE)
   {
@@ -77,7 +81,7 @@ void println(String text)
     Serial.println(text);
 }
 
-void indicate(int interval=75,int offInterval=-1) //Seems ok
+void indicate(int interval=75,int offInterval=-1) //This function is used to indicate the LED indicator
 {
   if(offInterval==-1)
     offInterval=interval;
@@ -87,7 +91,7 @@ void indicate(int interval=75,int offInterval=-1) //Seems ok
   delay(offInterval);
 }
 
-String httpRequest(String url)
+String httpRequest(String url) //This function is used to send the http request to the server and get the response .NOTE: HTTP_ERROR will be true if the request is failed
 {
   HTTP_ERROR=false;
   indicate( 30, 20);
@@ -119,14 +123,14 @@ String httpRequest(String url)
     return "W0";
   }
 }
-void httpResponse(String text , int responseCode=200, String contentType="text/html")
+void httpResponse(String text , int responseCode=200, String contentType="text/html") //This function is used to send the http response to the client 
 {
   server.send(responseCode, contentType, text);
   indicate(50);
 }
 
 
-void sync(int x=0)
+void sync(int x=0) //This function is used to sync the nodemcu with the server
 {
   indicate(10,20);
   if(SYNC_STATE)
@@ -217,7 +221,7 @@ void sync(int x=0)
   // return false;
 }
 
-void updateShiftRegister(bool *STATES)
+void updateShiftRegister(bool *STATES) //This function is used to update the shift register with the pin state
 {
   byte data = 0; //make it dynamic to PIN_COUNT
 
@@ -228,7 +232,7 @@ void updateShiftRegister(bool *STATES)
       bitSet(data, i);
   }
 
-  // Send the data to the 74HC595 shift register
+  // Send the data to the SIPO shift register
   digitalWrite(latchPin, LOW);
   shiftOut(dataPin, clockPin, MSBFIRST, data);
   digitalWrite(latchPin, HIGH);
@@ -276,13 +280,13 @@ void pinStateToggle(int pin) //This function is used to toggle the pin state
 }
 
 
-void turnOffAllPins(int x=0)
+void turnOffAllPins(int x=0) //This function is used to turn off all the pins
 {
   for(int i=0;i<PIN_COUNT;i++) 
     PIN_STATES[i]=false;
   updatePinStates();
 }
-void wifiSleepToggle(int x=0) 
+void wifiSleepToggle(int x=0)  //This function is used to turn on and off the wifi sleep mode
 {
   if(WIFI_SLEEP)
   {
@@ -303,12 +307,12 @@ void wifiSleepToggle(int x=0)
       indicate(80,200);
   }
 }
-void restartNodemcu(int x=0) 
+void restartNodemcu(int x=0) //This function is used to restart the nodemcu
 {
   ESP.restart();
 }
 
-void otaModeSet(bool mode)
+void otaModeSet(bool mode) //This function is used to turn on and off the OTA mode
 {
   if(mode)
     OTA_INS = true;
@@ -321,7 +325,7 @@ void otaModeSet(bool mode)
 
 
 // HTTP HANDLER Start
-void ota1()
+void ota1() //This function is used to turn on the OTA mode through the http request
 {
   if(OTA_INS)
    httpResponse("OTA is already running");
@@ -331,7 +335,7 @@ void ota1()
     httpResponse("OTA turned on");
   }
 }
-void ota0()
+void ota0() //This function is used to turn off the OTA mode through the http request
 {
   if(OTA_INS)
   {
@@ -341,7 +345,7 @@ void ota0()
   else
     httpResponse("OTA is already off");
 }
-void debug1()
+void debug1() //This function is used to turn on the debug mode through the http request
 {
   if(DEBUG_MODE)
     httpResponse("Debug mode is already on");
@@ -351,7 +355,7 @@ void debug1()
     httpResponse("Debug mode is turned on");
   }
 }
-void debug0()
+void debug0() //This function is used to turn off the debug mode through the http request
 {
   if(DEBUG_MODE)
   {
@@ -595,7 +599,7 @@ void loop()
 }
 
 
-bool tellMyIp()
+bool tellMyIp() //This function is used to tell the server that the nodemcu is connected to the wifi and the local ip of the nodemcu
 {
   if(WiFi.status() == WL_CONNECTED)
   {
@@ -617,21 +621,21 @@ bool tellMyIp()
 
 
 //Here will be some ir code for ir functionality
-const int IR_CODES_COUNT = 12; 
-const int IR_CODES[] = { 0, 33456255, 33441975, 33431775, 33480735, 33427695, 33460335, 33444015, 33478695, 0, 0, 0};
-void (*IR_CODE_TOOGLE_FUNC[])(int) = { restartNodemcu, wifiSleepToggle, turnOffAllPins, sync, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle}; 
-const int IR_TOOGLE_FUNC_DATA[] = { -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7}; 
+const int IR_CODES_COUNT = 12; //This is used to tell the count of ir codes
+const int IR_CODES[] = { 0, 33456255, 33441975, 33431775, 33480735, 33427695, 33460335, 33444015, 33478695, 0, 0, 0}; //This is used to tell the ir codes
+void (*IR_CODE_TOOGLE_FUNC[])(int) = { restartNodemcu, wifiSleepToggle, turnOffAllPins, sync, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle}; //This is used to tell the function toogle for the ir codes 
+const int IR_TOOGLE_FUNC_DATA[] = { -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7};  //This data will be used to pass the data to the toogle function
 
-void irReciveHandel(int irValue)
+void irReciveHandel(int irValue) //This function is used to handle the ir recive
 {
-  for(int i=0;i<IR_CODES_COUNT;i++) 
+  for(int i=0;i<IR_CODES_COUNT;i++)  //This is used to find the ir code and call the function
   {
-    if(irValue==IR_CODES[i])
+    if(irValue==IR_CODES[i])  
     {
-      IR_CODE_TOOGLE_FUNC[i](IR_TOOGLE_FUNC_DATA[i]);
+      IR_CODE_TOOGLE_FUNC[i](IR_TOOGLE_FUNC_DATA[i]); //This is used to call the function
       indicate(50);
       break;
     }
   }
-  println(String(irValue));
+  println(String(irValue)); //If you turn on(true) SERIAL_PRINT mode then it will print the ir value in the serial monitor or if you turn on(true) the DEBUG_MODE then it will send the ir value to the server
 }
