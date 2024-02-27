@@ -16,7 +16,7 @@ const char *OTA_HOSTNAME = "WebLume"; //OTA HOSTNAME
 const char *OTA_PASSWORD = "password";  //OTA PASSWORD
 const String WEBSERVER_API_URL = "http://192.168.0.0:8012/api.php"; //Here will be your web api url
 // webapi is used to get the pin state and sync the pin state with the server
-bool SIPO_REGISTER_MODE = false; //This is used to tell that the nodemcu is using the SIPO register(Ex- 74HC595 ic) or not
+bool SIPO_REGISTER_MODE = true; //This is used to tell that the nodemcu is using the SIPO register(Ex- 74HC595 ic) or not
 
 bool SYNC_MODE = true; //This is used to tell that the nodemcu is using the sync fetures or not
 bool SYNC_STATE = false; //This is used to tell that the nodemcu and server is synced or not
@@ -40,13 +40,13 @@ bool SERIAL_PRINT = false; //If you turn on this mode then it will print the deb
 
 //PIN Description
 //The latchPin,clockPin and dataPin are used if you turn on(true) the SIPO_REGISTER_MODE.
-const int latchPin = D3;  // Connect to the SIPO register Latch pin [Ex- 12 no pin for 74HC595] if SIPO_REGISTER_MODE is true
-const int clockPin = D5;  // Connect to the SIPO register Clock pin [Ex- 11 no pin for 74HC595] if SIPO_REGISTER_MODE is true
+const int latchPin = D1;  // Connect to the SIPO register Latch pin [Ex- 12 no pin for 74HC595] if SIPO_REGISTER_MODE is true
+const int clockPin = D2;  // Connect to the SIPO register Clock pin [Ex- 11 no pin for 74HC595] if SIPO_REGISTER_MODE is true
 const int dataPin = D6;   // Connect to the SIPO register Data pin [Ex- 14 no pin for 74HC595] if SIPO_REGISTER_MODE is true
-const int irReciverPin = D7; //Connect to the IR reciver signal pin
+const int irReciverPin = D5; //Connect to the IR reciver signal pin
 const int indicatorPin = D8; //Connect to the indicator led +ve pin
 //The maskedPins are used if you turn off(false) the SIPO_REGISTER_MODE. It will use you nodemcu pins as the output pins. -1 means the it will be skipped if any command received for that pin
-const int maskedPins[] = { D1, D2, D3, D5, D6, -1, -1, -1}; //will be use if SIPO_REGISTER_MODE is false
+const int maskedPins[] = { D1, D2, D3, D6, D7, -1, -1, -1}; //will be use if SIPO_REGISTER_MODE is false
 // --------------
 
 bool PIN_STATES[] = { false, false, false, false, false, false, false, false}; //The current state of the pins
@@ -221,21 +221,50 @@ void sync(int x=0) //This function is used to sync the nodemcu with the server
   // return false;
 }
 
-void updateShiftRegister(bool *STATES) //This function is used to update the shift register with the pin state
+void updateShiftRegister(bool *STATES,int len=PIN_COUNT) //This function is used to update the shift register with the pin state
 {
-  byte data = 0; //make it dynamic to PIN_COUNT
-
-  // Convert the array of boolean values to a single byte
-  for(int i=0;i<PIN_COUNT;i++)
-  {
-    if(STATES[i])
-      bitSet(data, i);
-  }
-
-  // Send the data to the SIPO shift register
+  bool MSB=true;
+  // Make sure to adjust the duration if you use optocouplour to drive the shift register. Note: optocouplour may not handel high frequency
+  int pulseDuration=100; //Duration of clock pulse and latch in microseconds
+  int stepDelay=10; //Delay between each step in microseconds
   digitalWrite(latchPin, LOW);
-  shiftOut(dataPin, clockPin, MSBFIRST, data);
+  digitalWrite(clockPin, LOW);
+  digitalWrite(dataPin, LOW);
+  if(MSB)
+  {
+    for(int i=len-1;i>=0;i--)
+    {
+      if(STATES[i])
+        digitalWrite(dataPin, HIGH);
+      else
+        digitalWrite(dataPin, LOW);
+      delayMicroseconds(stepDelay);
+      digitalWrite(clockPin, HIGH);
+      delayMicroseconds(pulseDuration);
+      digitalWrite(clockPin, LOW);
+      delayMicroseconds(pulseDuration);
+    }
+  }
+  else
+  {
+    for(int i=0;i<len;i++)
+    {
+      if(STATES[i])
+        digitalWrite(dataPin, HIGH);
+      else
+        digitalWrite(dataPin, LOW);
+      delayMicroseconds(stepDelay);
+      digitalWrite(clockPin, HIGH);
+      delayMicroseconds(pulseDuration);
+      digitalWrite(clockPin, LOW);
+      delayMicroseconds(pulseDuration);
+    }
+  }
   digitalWrite(latchPin, HIGH);
+  digitalWrite(clockPin, LOW);
+  digitalWrite(dataPin, LOW);
+  delayMicroseconds(stepDelay);
+  digitalWrite(latchPin, LOW);
 }
 
 void updatePinStates() //This function is used to update the pin state in hardware level
@@ -244,7 +273,7 @@ void updatePinStates() //This function is used to update the pin state in hardwa
 
   if(SIPO_REGISTER_MODE)
   {
-    updateShiftRegister(PIN_STATES);
+    updateShiftRegister(PIN_STATES,PIN_COUNT);
     is_changed=true; 
   }
   else
@@ -372,22 +401,26 @@ void debug0() //This function is used to turn off the debug mode through the htt
 
 void setup()
 {
-  // pinMode(D0,OUTPUT);
-  pinMode(D1, OUTPUT);
-  pinMode(D2, OUTPUT);
-  pinMode(D3, OUTPUT);
-  // pinMode(D4,OUTPUT);
-  pinMode(D5, OUTPUT);
-  pinMode(D6, OUTPUT);
-  pinMode(D8, OUTPUT);
-  // digitalWrite(D0,LOW);
-  digitalWrite(D1, LOW);
-  digitalWrite(D2, LOW);
-  digitalWrite(D3, LOW);
-  // digitalWrite(D4,LOW);
-  digitalWrite(D5, LOW);
-  digitalWrite(D6, LOW);
-  digitalWrite(D8, LOW); 
+  pinMode(indicatorPin,OUTPUT);
+  digitalWrite(indicatorPin,LOW);
+  if(SIPO_REGISTER_MODE)
+  {
+    pinMode(latchPin,OUTPUT);
+    digitalWrite(latchPin,LOW);
+    pinMode(clockPin,OUTPUT);
+    digitalWrite(clockPin,LOW);
+    pinMode(dataPin,OUTPUT);
+    digitalWrite(dataPin,LOW);
+    updateShiftRegister(PIN_STATES,PIN_COUNT);  
+  }
+  else
+  {
+    for(int i=0;i<PIN_COUNT;i++)
+    {
+      pinMode(maskedPins[i],OUTPUT);
+      digitalWrite(maskedPins[i],LOW);
+    }
+  }
 
   if (SERIAL_PRINT)
   {
@@ -622,7 +655,7 @@ bool tellMyIp() //This function is used to tell the server that the nodemcu is c
 
 //Here will be some ir code for ir functionality
 const int IR_CODES_COUNT = 12; //This is used to tell the count of ir codes
-const int IR_CODES[] = { 0, 33456255, 33441975, 33431775, 33480735, 33427695, 33460335, 33444015, 33478695, 0, 0, 0}; //This is used to tell the ir codes
+const int IR_CODES[] = { 0, 33454215, 33441975, 33431775, 33480735, 33427695, 33460335, 33444015, 33478695, 33486855, 33435855, 33468495}; //This is used to tell the ir codes
 void (*IR_CODE_TOOGLE_FUNC[])(int) = { restartNodemcu, wifiSleepToggle, turnOffAllPins, sync, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle, pinStateToggle}; //This is used to tell the function toogle for the ir codes 
 const int IR_TOOGLE_FUNC_DATA[] = { -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7};  //This data will be used to pass the data to the toogle function
 
