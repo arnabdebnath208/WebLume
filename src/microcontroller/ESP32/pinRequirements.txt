@@ -1,0 +1,38 @@
+# This file contains the pin requirements for the ESP32 microcontroller
+Pin Requirements
+Devices 9 Output Pin
+Devices:
+    D23 GPIO 23
+    D19 GPIO 19
+    D18 GPIO 18
+    TX2 GPIO 17
+    RX2 GPIO 16
+    D4  GPIO 4
+    D27 GPIO 27
+    D26 GPIO 26
+    D25 GPIO 25 #Inbuilt Power LED
+AP Mode Toggle Switch 1 Input Pin
+AP:
+    D34 GPIO 34
+IR Reciver Pin 1 Input Pin
+IR Reciver:
+    D32 GPIO 32
+IR Transmitter Pin 1 Output Pin
+IR Transmitter:
+    D5  GPIO 5
+Indicator LED 1 Output Pin
+Indicator LED:
+    D2  GPIO 2
+Network Indicator LED 1 Output Pin
+Network Indicator LED:
+    D15 GPIO 15
+Buzzer 1 Output Pin
+Buzzer:
+    D13 GPIO 13
+Reset Button 1 Input Pin
+Reset:
+    D0  GPIO 0
+DHT11 Sensor 1 Input Pin
+DHT11:
+    D13 GPIO 33
+Total Pins: 17
