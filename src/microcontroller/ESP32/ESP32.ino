@@ -143,7 +143,7 @@ void setup()
 
     if(NETWORK_MODE == "AP")
         turnOnAP();
-    else if(NETWORK_MODE == "WIFI")
+    else if(NETWORK_MODE == "STA" || NETWORK_MODE == "WIFI") //if NETWORK_MODE is STA or WIFI then turn on WiFi
         turnOnWiFi();
     else
         Serial.println("No Network Mode is defined");

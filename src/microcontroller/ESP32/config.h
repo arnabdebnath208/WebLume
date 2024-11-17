@@ -21,7 +21,7 @@
 #define DEFAULT_OTA_PORT "3232" //Default OTA Port : Used for OTA
 #define DEFAULT_OTA_PASSWORD "admin" //Default OTA Password : Used for OTA Authentication
 
-#define DEFAULT_NETWORK_MODE "AP" //WIFI,AP,NONE : Default network mode after boot
+#define DEFAULT_NETWORK_MODE "AP" //(WIFI/STA),AP,NONE : Default network mode after boot
 
 #define DEFAULT_SERVER_API "http://192.168.0.10:80/api.php" //Default Server API : Used for syncing device state with the web server
 
