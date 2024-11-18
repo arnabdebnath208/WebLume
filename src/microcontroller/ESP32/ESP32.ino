@@ -715,7 +715,7 @@ bool turnOnWebServer()
         }
     });
     server.on("/devInfo",[](){
-        String response = "{\"id\":\""+String(ID)+"\",\"version\":\""+String(VIRSION)+"\",\"microcontroller\":\""+String(MICROCONTROLLER)+"\"}";
+        String response = "{\"id\":\""+String(ID)+"\",\"version\":\""+String(VERSION)+"\",\"microcontroller\":\""+String(MICROCONTROLLER)+"\"}";
         httpResponse(response,200,"application/json");
     });
     server.onNotFound([](){
@@ -930,6 +930,14 @@ bool loadConfig() // Load Config: Load presaved config to variables from NVS
     if(configExists==1)
     {
         Serial.println("Configurations Exists");
+        // Here is the process to check for version change and update the config
+        if(String(VERSION)!=preferences.getString("VERSION","NOVERSION"))
+        {
+            Serial.println("Version Changed from "+preferences.getString("VERSION","NOVERSION")+" to "+VERSION);
+            preferences.end();
+            saveNewConfig();
+            preferences.begin("config", true);
+        }
         WIFI_SSID = preferences.getString("WIFI_SSID",DEFAULT_WIFI_SSID);
         WIFI_PASSWORD = preferences.getString("WIFI_PASSWORD",DEFAULT_WIFI_PASSWORD);
         AP_SSID = preferences.getString("AP_SSID",DEFAULT_AP_SSID);
@@ -977,6 +985,39 @@ void saveDefaultConfig() // Save Default Config: Save the default config to NVS
     preferences.putString("SERVER_API",SERVER_API);
     preferences.end();
     Serial.println("Configurations Saved");
+}
+void saveNewConfig() // Save New Config which was not saved before
+{
+    Serial.println("Saving New Configurations");
+    preferences.begin("config", false);
+    preferences.putInt("exists",1);
+    preferences.putString("VERSION",VERSION);
+    if(!preferences.isKey("WIFI_SSID"))
+        preferences.putString("WIFI_SSID",WIFI_SSID);
+    if(!preferences.isKey("WIFI_PASSWORD"))
+        preferences.putString("WIFI_PASSWORD",WIFI_PASSWORD);
+    if(!preferences.isKey("AP_SSID"))
+        preferences.putString("AP_SSID",AP_SSID);
+    if(!preferences.isKey("AP_PASSWORD"))
+        preferences.putString("AP_PASSWORD",AP_PASSWORD);
+    if(!preferences.isKey("HOSTNAME"))
+        preferences.putString("HOSTNAME",HOSTNAME);
+    if(!preferences.isKey("ACCESS_TOKEN"))
+        preferences.putString("ACCESS_TOKEN",ACCESS_TOKEN);
+    if(!preferences.isKey("API_KEY"))
+        preferences.putString("API_KEY",API_KEY);
+    if(!preferences.isKey("NODE_ID"))
+        preferences.putString("NODE_ID",NODE_ID);
+    if(!preferences.isKey("OTA_PORT"))
+        preferences.putString("OTA_PORT",OTA_PORT);
+    if(!preferences.isKey("OTA_PASSWORD"))
+        preferences.putString("OTA_PASSWORD",OTA_PASSWORD);
+    if(!preferences.isKey("NETWORK_MODE"))
+        preferences.putString("NETWORK_MODE",NETWORK_MODE);
+    if(!preferences.isKey("SERVER_API"))
+        preferences.putString("SERVER_API",SERVER_API);
+    preferences.end();
+    Serial.println("New Configurations Saved");
 }
 void resetDevice() // Reset Device: Reset the device config to default
 {
