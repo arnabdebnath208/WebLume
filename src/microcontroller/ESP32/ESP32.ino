@@ -273,6 +273,8 @@ httpResponse_t httpRequest(String url, String requestMethod, String data, String
 
 bool isAuthenticated() // Check if the request is authenticated
 {
+    if(ACCESS_TOKEN=="")
+        return true;
     if(server.hasArg("accessToken"))
     {
         if(server.arg("accessToken")==ACCESS_TOKEN)
