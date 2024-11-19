@@ -1074,6 +1074,7 @@ bool restoreDeviceState() //This function is used to restore the devices state f
 
         if (doc.containsKey("devices")) 
         {
+            bool isServerSynced = true;
             JsonArray devicesArray = doc["devices"].as<JsonArray>();
             for (JsonVariant deviceVariant : devicesArray) 
             {
@@ -1083,14 +1084,20 @@ bool restoreDeviceState() //This function is used to restore the devices state f
                 int devicePwmValue = deviceObject["pwmValue"].as<int>();
                 if(deviceId>=0 && deviceId<deviceCount)
                 {
-                    devices[deviceId].setState(deviceState);
+                    if(devices[deviceId].state!=deviceState)
+                    {
+                        if(devices[deviceId].state==1&&deviceState==0)
+                            isServerSynced = false;  // Don't turn off the device if it is already on and sync the state with the server
+                        else if(devices[deviceId].state==0&&deviceState==1)
+                            devices[deviceId].on();
+                    }
                     devices[deviceId].setPwmValue(devicePwmValue);
                 }
             }
             Serial.println("Device State Restored");
             deviceStateSyncFailedCount = 0;
             isSyncWithServerDone = true;
-            isSyncTheServerDone = true;
+            isSyncTheServerDone = isServerSynced;
             return true;
         }
         else
