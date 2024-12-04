@@ -224,16 +224,6 @@ void pinIOManager()
     pinMode(IR_SEND_PIN,OUTPUT);
     pinMode(BUZZER,OUTPUT);
     pinMode(IR_RECV_PIN,INPUT);
-    for(int i=0;i<inputSwitchCount;i++)
-    {
-        if(inputSwitches[i].isEnable)
-            pinMode(inputSwitches[i].pin,INPUT);
-    }
-    for(int i=0;i<deviceCount;i++)
-    {
-        if(devices[i].isEnable)
-            pinMode(devices[i].pin,OUTPUT);
-    }
 }
 
 

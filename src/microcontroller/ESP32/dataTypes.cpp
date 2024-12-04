@@ -24,6 +24,8 @@ typedef struct input_switch_struct
         this->longPressFunction = longPressFunction;
         this->name = name;
         this->isEnable = isEnable;
+        if(this->isEnable)
+            pinMode(this->pin,INPUT);
     }
 } inputSwitch;
 
@@ -80,6 +82,8 @@ class device //This class is used to create a device object
         else 
             this->pwmValue = PWM_MAX_VALUE;
         this->state = false;
+        if(this->isEnable)
+            pinMode(this->pin,OUTPUT);
     }
     bool on() //This function is used to turn on the device
     {
