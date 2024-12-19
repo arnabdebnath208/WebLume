@@ -290,8 +290,70 @@ void handelApi()
 {
     if(server.method()==HTTP_GET)
     {
-        String response = "Hello From WebLume API!";
-        httpResponse(response,200);
+        if(server.hasArg("fetch"))
+        {
+            String fetch = server.arg("fetch");
+            if(fetch == "dht11")
+            {
+                float temperature = dht.readTemperature();
+                float humidity = dht.readHumidity();
+                if(isnan(temperature) || isnan(humidity))
+                {
+                    String response = "{\"status\":\"failed\",\"message\":\"Failed to read DHT11 Sensor\"}";
+                    httpResponse(response,500, "application/json");
+                }
+                else
+                {
+                    String response = "{\"status\":\"success\",\"temperature\":"+String(temperature)+",\"humidity\":"+String(humidity)+"}";
+                    httpResponse(response,200, "application/json");
+                }            
+            }
+            else if(fetch == "temperature")
+            {
+                float temperature = dht.readTemperature();
+                if(isnan(temperature))
+                {
+                    String response = "{\"status\":\"failed\",\"message\":\"Failed to read DHT11 Sensor\"}";
+                    httpResponse(response,500, "application/json");
+                }
+                else
+                {
+                    String response = "{\"status\":\"success\",\"temperature\":"+String(temperature)+"}";
+                    httpResponse(response,200, "application/json");
+                }
+            }
+            else if(fetch == "humidity")
+            {
+                float humidity = dht.readHumidity();
+                if(isnan(humidity))
+                {
+                    String response = "{\"status\":\"failed\",\"message\":\"Failed to read DHT11 Sensor\"}";
+                    httpResponse(response,500, "application/json");
+                }
+                else
+                {
+                    String response = "{\"status\":\"success\",\"humidity\":"+String(humidity)+"}";
+                    httpResponse(response,200, "application/json");
+                }
+            }
+            else if(fetch == "sensors")            
+            {
+                float dhtTemperature = dht.readTemperature();
+                float dhtHumidity = dht.readHumidity();
+                String response = "{\"status\":\"success\",\"dht11\":{\"temperature\":"+String(dhtTemperature)+",\"humidity\":"+String(dhtHumidity)+"}}";
+                httpResponse(response,200, "application/json");
+            }
+            else
+            {
+                String response = "{\"status\":\"failed\",\"message\":\"Invalid Fetch Key!\"}";
+                httpResponse(response,400, "application/json");
+            }
+        }
+        else
+        {
+            String response = "Hello From WebLume API!";
+            httpResponse(response,200);
+        }
         return;
     }
     else if(server.method()==HTTP_POST)
@@ -573,6 +635,13 @@ void handelApi()
                     String response = "{\"status\":\"success\",\"humidity\":"+String(humidity)+"}";
                     httpResponse(response,200, "application/json");
                 }
+            }
+            else if(fetch == "sensors")            
+            {
+                float dhtTemperature = dht.readTemperature();
+                float dhtHumidity = dht.readHumidity();
+                String response = "{\"status\":\"success\",\"dht11\":{\"temperature\":"+String(dhtTemperature)+",\"humidity\":"+String(dhtHumidity)+"}}";
+                httpResponse(response,200, "application/json");
             }
             else if(fetch == "devices")
             {
