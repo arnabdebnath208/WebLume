@@ -1044,6 +1044,7 @@ void saveDefaultConfig() // Save Default Config: Save the default config to NVS
 {
     preferences.begin("config", false);
     preferences.putInt("exists",1);
+    preferences.putString("VERSION",VERSION);
     preferences.putString("WIFI_SSID",WIFI_SSID);
     preferences.putString("WIFI_PASSWORD",WIFI_PASSWORD);
     preferences.putString("AP_SSID",AP_SSID);
