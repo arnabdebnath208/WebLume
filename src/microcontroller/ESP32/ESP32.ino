@@ -134,7 +134,7 @@ void setup()
 
     Serial.begin(USB_SERIAL_BAUD_RATE);
     delay(10);
-    Serial.println("\nWebLume");
+    Serial.println("\n"+String(NAME)+" "+String(VERSION)+"\n"+String(MICROCONTROLLER)+"\n");
 
     configHandle(); // Load Config: Load presaved config or save default config to NVS
     
@@ -168,7 +168,11 @@ void loop()
             digitalWrite(NETWORK_INDICATOR_LED,LOW);
             if(isWiFiConnected==false)
             {
-                Serial.println("Connected to "+WiFi.SSID()+" [IP: "+WiFi.localIP().toString()+"]");
+                Serial.println("WiFi Connected");
+                Serial.println("SSID: "+WiFi.SSID());
+                Serial.println("RSSI: "+String(WiFi.RSSI())+" dBm");
+                Serial.println("IP: "+WiFi.localIP().toString());
+                Serial.println("MAC: "+WiFi.macAddress());
                 isWiFiConnected = true;
             }
             //Things to do when connected to WiFi
@@ -863,6 +867,7 @@ void turnOnWiFi()
     else
     {
         WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
+        WiFi.setHostname(HOSTNAME.c_str());
         Serial.print("Connecting to "+WIFI_SSID+" ");
         for(uint8_t i=0;i<10;i++)
         {
@@ -870,6 +875,10 @@ void turnOnWiFi()
             {
                 Serial.println();
                 Serial.println("WiFi Connected");
+                Serial.println("WIFI SSID: "+WIFI_SSID);
+                Serial.println("RSSI: "+String(WiFi.RSSI())+" dBm");
+                Serial.println("IP Address: "+WiFi.localIP().toString());
+                Serial.println("MAC Address: "+WiFi.macAddress());
                 isWiFiConnected=true;
                 digitalWrite(NETWORK_INDICATOR_LED,LOW);
                 break;
@@ -932,8 +941,11 @@ void turnOnAP()
     else
         WiFi.softAP(AP_SSID.c_str());
     AP = true;
-    Serial.println("AP Mode Started[SSID: "+String(AP_SSID)+", Password: "+String(AP_PASSWORD)+"]");
+    Serial.println("Access Point Started");
+    Serial.println("SSID: "+String(AP_SSID));
+    Serial.println("Password: "+String(AP_PASSWORD));
     Serial.println("IP Address: "+WiFi.softAPIP().toString());
+    Serial.println("MAC Address: "+WiFi.softAPmacAddress());
     delay(1000);
 }
 void turnOffAP()
