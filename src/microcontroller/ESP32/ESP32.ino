@@ -11,6 +11,7 @@
 #include "config.h"
 #include "pinConfig.h"
 #include "devInfo.h"
+#include "device.h"
 
 
 
@@ -73,26 +74,25 @@ void resetDevice();
 void configHandle();
 bool restoreDeviceState();
 bool storeDeviceState();
-void powerOffAllDevices();
 void switchHandle();
 void intervalHandle();
 
 
-
-// device(int id,int pin,char * name,bool isEnable=true,bool isInverted=false,bool isPWM=false)
+//device(int id,int groupId,uint8_t gpioPin,char * name = "",bool isInverted = false,bool isEnable = true,bool initState = false,bool isPWM = false,int initPwmValue = MCU_PWM_MAX,int pwmMinValue = MCU_PWM_MIN,int pwmMaxValue = MCU_PWM_MAX)
 device devices[] = {
-    device(0,23,"Power Outlate"),
-    device(1,19,"Celling Fan"),
-    device(2,18,"Tube Light"),
-    device(3,17,"LED Bulb"),
-    device(4,16,"Celling Light 1"),
-    device(5,4,"Celling Light 2"),
-    device(6,27,"Celling Light 3"),
-    device(7,26,"Celling Light 4"),
-    device(8,25,"Inbuilt Power LED",true,false,true),
+    device(0,0,23,"Power Outlate"),
+    device(1,1,19,"Celling Fan"),
+    device(2,2,18,"Tube Light"),
+    device(3,2,17,"LED Bulb"),
+    device(4,3,16,"Celling Light 1"),
+    device(5,3,4,"Celling Light 2"),
+    device(6,3,27,"Celling Light 3"),
+    device(7,3,26,"Celling Light 4"),
+    device(8,4,25,"Inbuilt Power LED",false,true,false,true,MCU_PWM_MAX,1,MCU_PWM_MAX),
 };
 int deviceCount = sizeof(devices)/sizeof(device);
 
+deviceManager devManager(devices,deviceCount);
 
 // inputSwitch(int pin,int triggerState,int longPressTime,void (*singlePressFunction)()=NULL,void (*longPressFunction)()=NULL,char * name="\0",bool isEnable=true)
 inputSwitch inputSwitches[] = {
@@ -110,18 +110,18 @@ int intervalTaskCount = sizeof(intervalTasks)/sizeof(intervalTask);
 
 // irInput(uint32_t value,void (*singlePressFunction)()=NULL,char * name="\0",bool isEnable=true);
 irInput irInputs[] = {
-    irInput(0x00FF7F80,[](){if(devices[0].toggle()) isSyncTheServerDone=false;},"Outlate"),
-    irInput(0xFE017F80,[](){if(devices[1].toggle()) isSyncTheServerDone=false;},"Celling Fan"),
-    irInput(0xF7087F80,[](){if(devices[2].toggle()) isSyncTheServerDone=false;},"Tube Light"),
-    irInput(0xF6097F80,[](){if(devices[3].toggle()) isSyncTheServerDone=false;},"LED Bulb"),
-    irInput(0xF9067F80,[](){if(devices[4].toggle()) isSyncTheServerDone=false;},"Celling 1"),
-    irInput(0xFD027F80,[](){if(devices[5].toggle()) isSyncTheServerDone=false;},"Celling 2"),
-    irInput(0xFA057F80,[](){if(devices[6].toggle()) isSyncTheServerDone=false;},"Celling 3"),
-    irInput(0xFC037F80,[](){if(devices[7].toggle()) isSyncTheServerDone=false;},"Celling 4"),
-    irInput(0xF8077F80,[](){if(devices[8].toggle()) isSyncTheServerDone=false;},"Inbuilt Power LED"),
-    irInput(0xF50A7F80,[](){if(devices[8].decreasePwmValue(devices[8].pwmValue>10?10:1)) isSyncTheServerDone=false;},"Night Lamp Decrease"),
-    irInput(0xE01F7F80,[](){if(devices[8].increasePwmValue(devices[8].pwmValue>15?10:1)) isSyncTheServerDone=false;},"Night Lamp Increase"),
-    irInput(0xED127F80,[](){powerOffAllDevices(); isSyncTheServerDone=false;},"PowerOffAllDevices"),
+    irInput(0x00FF7F80,[](){if(devManager.toggle(0)) isSyncTheServerDone=false;},"Outlate"),
+    irInput(0xFE017F80,[](){if(devManager.toggle(1)) isSyncTheServerDone=false;},"Celling Fan"),
+    irInput(0xF7087F80,[](){if(devManager.toggle(2)) isSyncTheServerDone=false;},"Tube Light"),
+    irInput(0xF6097F80,[](){if(devManager.toggle(3)) isSyncTheServerDone=false;},"LED Bulb"),
+    irInput(0xF9067F80,[](){if(devManager.toggle(4)) isSyncTheServerDone=false;},"Celling 1"),
+    irInput(0xFD027F80,[](){if(devManager.toggle(5)) isSyncTheServerDone=false;},"Celling 2"),
+    irInput(0xFA057F80,[](){if(devManager.toggle(6)) isSyncTheServerDone=false;},"Celling 3"),
+    irInput(0xFC037F80,[](){if(devManager.toggle(7)) isSyncTheServerDone=false;},"Celling 4"),
+    irInput(0xF8077F80,[](){if(devManager.toggle(8)) isSyncTheServerDone=false;},"Inbuilt Power LED"),
+    irInput(0xF50A7F80,[](){if(devManager.decreasePwmValue(8,devManager.getByIndex(8)->pwmValue>10?10:1)) isSyncTheServerDone=false;},"Night Lamp Decrease"),
+    irInput(0xE01F7F80,[](){if(devManager.increasePwmValue(8,devManager.getByIndex(8)->pwmValue>15?10:1)) isSyncTheServerDone=false;},"Night Lamp Increase"),
+    irInput(0xED127F80,[](){if(devManager.powerOffAll()>0) isSyncTheServerDone=false;},"Power Off All Device"),
     irInput(0xE11E7F80,[](){toggleWiFiMode();},"WIFI Toggle"),
     irInput(0xE51A7F80,[](){toggleAPMode();},"AP Toggle"),
     irInput(0xFB047F80,[](){debugMode=!debugMode;},"Debug Mode Toggle"),
@@ -478,120 +478,345 @@ void handelApi()
         }
         else if(server.hasArg("control")) // Control the devices
         {
-            if(server.hasArg("devId")&&server.hasArg("state"))
+            device * targetDevice = NULL;
+            if(server.hasArg("devIndex"))
             {
-                int devId = server.arg("devId").toInt();
-                String state = server.arg("state");
-                if(devId>=0 && devId<deviceCount)
+                int devIndex = server.arg("devIndex").toInt();
+                targetDevice = devManager.getByIndex(devIndex);
+                if(targetDevice == NULL)
                 {
-                    if(state == "on")
-                    {
-                        if(devices[devId].on())
-                            isSyncTheServerDone = false;
-                        String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" Turned On\"}";
-                        httpResponse(response,200, "application/json");
-                    }
-                    else if(state == "off")
-                    {
-                        if(devices[devId].off())
-                            isSyncTheServerDone = false;
-                        String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" Turned Off\"}";
-                        httpResponse(response,200, "application/json");
-                    }
-                    else if(state == "toggle")
-                    {
-                        if(devices[devId].toggle())
-                            isSyncTheServerDone = false;
-                        String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" Toggled\"}";
-                        httpResponse(response,200, "application/json");
-                    }
-                    else
-                    {
-                        String response = "{\"status\":\"failed\",\"message\":\"Invalid State!\"}";
-                        httpResponse(response,400, "application/json");
-                    }
-                }
-                else
-                {
-                    String response = "{\"status\":\"failed\",\"message\":\"Invalid Device ID!\"}";
+                    String response = "{\"status\":\"failed\",\"message\":\"Invalid device index!\"}";
                     httpResponse(response,400, "application/json");
+                    return;
                 }
             }
-            else if(server.hasArg("devId")&&server.hasArg("pwmValue"))
-            {  
+            else if(server.hasArg("devId"))
+            {
                 int devId = server.arg("devId").toInt();
-                int pwmValue = 0;
-                uint8_t pwmValueMode = 0;
-                if (server.arg("pwmValue").startsWith("+"))
+                targetDevice = devManager.getById(devId);
+                if(targetDevice == NULL)
                 {
-                    pwmValue = server.arg("pwmValue").substring(1).toInt();
-                    pwmValueMode = 1;
+                    String response = "{\"status\":\"failed\",\"message\":\"Invalid device id!\"}";
+                    httpResponse(response,400, "application/json");
+                    return;
                 }
-                else if (server.arg("pwmValue").startsWith("-"))
+            }
+            
+            if(targetDevice != NULL)
+            {
+                if(server.hasArg("state"))
                 {
-                    pwmValue = server.arg("pwmValue").substring(1).toInt();
-                    pwmValueMode = 2;
-                }
-                else 
-                {
-                    pwmValue = server.arg("pwmValue").toInt();
-                    pwmValueMode = 0;
-                }
-                if(devId>=0 && devId<deviceCount)
-                {
-                    if(devices[devId].isPWM)
+                    String state = server.arg("state");
+                    if(state == "on" || state == "true" || state == "1")
                     {
-                        if(pwmValueMode==0)
+                        if(targetDevice->on())
                         {
-                            if(devices[devId].pwmControl(pwmValue))
-                                isSyncTheServerDone = false;
-                            String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" PWM Value: "+String(pwmValue)+"\"}";
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" turned on\"}";
                             httpResponse(response,200, "application/json");
-                        }
-                        else if(pwmValueMode==1)
-                        {
-                            if(devices[devId].increasePwmValue(pwmValue))
-                                isSyncTheServerDone = false;
-                            String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" PWM Value Increased by "+String(pwmValue)+"\"}";
-                            httpResponse(response,200, "application/json");
-                        }
-                        else if(pwmValueMode==2)
-                        {
-                            if(devices[devId].decreasePwmValue(pwmValue))
-                                isSyncTheServerDone = false;
-                            String response = "{\"status\":\"success\",\"message\":\""+String(devices[devId].name)+" PWM Value Decreased by "+String(pwmValue)+"\"}";
-                            httpResponse(response,200, "application/json");
+                            return;
                         }
                         else
                         {
-                            String response = "{\"status\":\"failed\",\"message\":\"Invalid PWM Value!\"}";
+                            String response;
+                            if(targetDevice->isEnable)
+                                response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
                             httpResponse(response,400, "application/json");
+                            return;
+                        }
+                    }
+                    else if(state == "off" || state == "false" || state == "0")
+                    {
+                        if(targetDevice->off())
+                        {
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" turned off\"}";
+                            httpResponse(response,200, "application/json");
+                            return;
+                        }
+                        else
+                        {
+                            String response;
+                            if(targetDevice->isEnable)
+                                response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
+                            httpResponse(response,400, "application/json");
+                            return;
+                        }
+                    }
+                    else if(state == "toggle")
+                    {
+                        if(targetDevice->toggle())
+                        {
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" toggled["+String(targetDevice->state?"on":"off")+"]\"}";
+                            httpResponse(response,200, "application/json");
+                            return;
+                        }
+                        else
+                        {
+                            String response;
+                            if(targetDevice->isEnable)
+                                response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
+                            httpResponse(response,400, "application/json");
+                            return;
                         }
                     }
                     else
                     {
-                        String response = "{\"status\":\"failed\",\"message\":\""+String(devices[devId].name)+" is not PWM Device!\"}";
+                        String response = "{\"status\":\"failed\",\"message\":\"Invalid state!\"}";
+                        httpResponse(response,400, "application/json");       
+                        return;
+                    }
+                }
+                else if(server.hasArg("pwmValue"))
+                {
+                    int pwmValue = server.arg("pwmValue").toInt();
+                    if(targetDevice->pwmControl(pwmValue))
+                    {
+                        isSyncTheServerDone = false;
+                        String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" PWM value set to "+String(targetDevice->pwmValue)+"\"}";
+                        httpResponse(response,200, "application/json");
+                        return;
+                    }
+                    else
+                    {
+                        String response;
+                        if(targetDevice->isEnable)
+                        {
+                            if(targetDevice->isPWM)
+                            {
+                                if(targetDevice->state)
+                                    response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                                else
+                                {
+                                    isSyncTheServerDone = false;
+                                    response = "{\"status\":\"failed\",\"message\":\"PWM value saved but the device is off!\"}";
+                                }
+                            }
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This is not a pwm device!\"}";
+                        }
+                        else
+                            response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
+                        httpResponse(response,400, "application/json");
+                        return;
+                    }
+                }
+                else if(server.hasArg("increasePwmValue"))
+                {
+                    int valueToIncrease = server.arg("increasePwmValue").toInt();
+                    if(targetDevice->increasePwmValue(valueToIncrease))
+                    {
+                        isSyncTheServerDone = false;
+                        String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" PWM value set to "+String(targetDevice->pwmValue)+"\"}";
+                        httpResponse(response,200, "application/json");
+                        return;
+                    }
+                    else
+                    {
+                        String response;
+                        if(targetDevice->isEnable)
+                        {
+                            if(targetDevice->isPWM)
+                            {
+                                if(targetDevice->state)
+                                    response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                                else
+                                {
+                                    isSyncTheServerDone = false;
+                                    response = "{\"status\":\"failed\",\"message\":\"PWM value saved but the device is off!\"}";
+                                }
+                            }
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This is not a pwm device!\"}";
+                        }
+                        else
+                            response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
+                        httpResponse(response,400, "application/json");
+                        return;
+                    }
+
+                }
+                else if(server.hasArg("decreasePwmValue"))
+                {
+                    int valueToDecrease = server.arg("decreasePwmValue").toInt();
+                    if(targetDevice->decreasePwmValue(valueToDecrease))
+                    {
+                        isSyncTheServerDone = false;
+                        String response = "{\"status\":\"success\",\"message\":\""+String(targetDevice->name)+" PWM value set to "+String(targetDevice->pwmValue)+"\"}";
+                        httpResponse(response,200, "application/json");
+                        return;
+                    }
+                    else
+                    {
+                        String response;
+                        if(targetDevice->isEnable)
+                        {
+                            if(targetDevice->isPWM)
+                            {
+                                if(targetDevice->state)
+                                    response = "{\"status\":\"failed\",\"message\":\"Something went wrong!\"}";
+                                else
+                                {
+                                    isSyncTheServerDone = false;
+                                    response = "{\"status\":\"failed\",\"message\":\"PWM value saved but the device is off!\"}";
+                                }
+                            }
+                            else
+                                response = "{\"status\":\"failed\",\"message\":\"This is not a pwm device!\"}";
+                        }
+                        else
+                            response = "{\"status\":\"failed\",\"message\":\"This deviced is disabled!\"}";
                         httpResponse(response,400, "application/json");
                         return;
                     }
                 }
                 else
                 {
-                    String response = "{\"status\":\"failed\",\"message\":\"Invalid Device ID!\"}";
+                    String response = "{\"status\":\"failed\",\"message\":\"Invalid control action!\"}";
                     httpResponse(response,400, "application/json");
                 }
             }
-            else if(server.hasArg("irSend"))
+            else if(server.hasArg("groupId"))
             {
-                uint32_t value = server.arg("irSend").toInt();
-                irSend(value);
-                String response = "{\"status\":\"success\",\"message\":\"IR Signal: "+String(value)+"\"}";
-                httpResponse(response,200, "application/json");
+                int groupId = server.arg("groupId").toInt();
+                if(server.hasArg("state"))
+                {
+                    String state = server.arg("state");
+                    if(state == "on" || state == "true" || state == "1")
+                    {
+                        int controlledDeviceCount = devManager.onByGroupId(groupId);
+                        if(controlledDeviceCount>0)
+                        {
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices has turned on sucessfully\"}";
+                            httpResponse(response,200, "application/json");       
+                            return;
+                        }
+                        else
+                        {
+                            String response = "{\"status\":\"failed\",\"message\":\"0 devices has turned on!\"}";
+                            httpResponse(response,400, "application/json");       
+                            return;
+                        }
+                    }
+                    else if(state == "off" || state == "false" || state == "0")
+                    {
+                        int controlledDeviceCount = devManager.offByGroupId(groupId);
+                        if(controlledDeviceCount>0)
+                        {
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices has turned off sucessfully\"}";
+                            httpResponse(response,200, "application/json");       
+                            return;
+                        }
+                        else
+                        {
+                            String response = "{\"status\":\"failed\",\"message\":\"0 devices has turned off!\"}";
+                            httpResponse(response,400, "application/json");       
+                            return;
+                        }
+                    }
+                    else if(state == "toggle")
+                    {
+                        int controlledDeviceCount = devManager.toggleByGroupId(groupId);
+                        if(controlledDeviceCount>0)
+                        {
+                            isSyncTheServerDone = false;
+                            String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices has toggled sucessfully\"}";
+                            httpResponse(response,200, "application/json");       
+                            return;
+                        }
+                        else
+                        {
+                            String response = "{\"status\":\"failed\",\"message\":\"0 devices has toggled!\"}";
+                            httpResponse(response,400, "application/json");       
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\"Invalid state!\"}";
+                        httpResponse(response,400, "application/json");       
+                        return;
+                    }
+
+                }
+                else if(server.hasArg("pwmValue"))
+                {
+                    int pwmValue = server.arg("pwmValue").toInt();
+                    int controlledDeviceCount = 0;
+                    controlledDeviceCount = devManager.pwmControlByGroupId(groupId,pwmValue);
+                    isSyncTheServerDone = false;
+                    if(controlledDeviceCount>0)
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices pwm value cotrolled\"}";
+                        httpResponse(response,200, "application/json");       
+                        return;
+                    }
+                    else
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\"0 devices pwm value cotrolled\"}";
+                        httpResponse(response,400, "application/json");       
+                        return;
+                    }
+                }
+                else if(server.hasArg("increasePwmValue"))
+                {
+                    int valueToIncrease = server.arg("increasePwmValue").toInt();
+                    int controlledDeviceCount = 0;
+                    controlledDeviceCount = devManager.increasePwmValuesByGroupId(groupId,valueToIncrease);
+                    isSyncTheServerDone = false;
+                    if(controlledDeviceCount>0)
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices pwm value cotrolled\"}";
+                        httpResponse(response,200, "application/json");       
+                        return;
+                    }
+                    else
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\"0 devices pwm value cotrolled\"}";
+                        httpResponse(response,400, "application/json");       
+                        return;
+                    }
+                }
+                else if(server.hasArg("decreasePwmValue"))
+                {
+                    int valueToDecrease = server.arg("decreasePwmValue").toInt();
+                    int controlledDeviceCount = 0;
+                    controlledDeviceCount = devManager.decreasePwmValuesByGroupId(groupId,valueToDecrease);
+                    isSyncTheServerDone = false;
+                    if(controlledDeviceCount>0)
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\""+String(controlledDeviceCount)+" devices pwm value cotrolled\"}";
+                        httpResponse(response,200, "application/json");       
+                        return;
+                    }
+                    else
+                    {
+                        String response = "{\"status\":\"failed\",\"message\":\"0 devices pwm value cotrolled\"}";
+                        httpResponse(response,400, "application/json");       
+                        return;
+                    }
+                }
+                else
+                {
+                    String response = "{\"status\":\"failed\",\"message\":\"Invalid control action!\"}";
+                    httpResponse(response,400, "application/json");
+                    return;
+                }
             }
             else
             {
-                String response = "{\"status\":\"failed\",\"message\":\"Invalid Request!\"}";
+                String response = "{\"status\":\"failed\",\"message\":\"Invalid control request!!\"}";
                 httpResponse(response,400, "application/json");
+                return;
             }
         }
         else if(server.hasArg("fetch")) // Fetch the data
@@ -650,11 +875,15 @@ void handelApi()
             else if(fetch == "devices")
             {
                 String response = "{\"status\":\"success\",\"devices\":[";
-                for(int i=0;i<deviceCount;i++)
+                int i = 0;
+                device * targetDevice = devManager.getByIndex(i);
+                while(targetDevice!=NULL)
                 {
-                    response += "{\"id\":"+String(devices[i].id)+",\"name\":\""+String(devices[i].name)+"\",\"state\":"+String(devices[i].state)+",\"pwmValue\":"+String(devices[i].pwmValue)+"}";
-                    if(i<deviceCount-1)
+                    response += "{\"id\":"+String(targetDevice->id)+",\"name\":\""+String(targetDevice->name)+"\",\"state\":"+String(targetDevice->state)+",\"pwmValue\":"+String(targetDevice->pwmValue)+"}";
+                    device * nextDevice = devManager.getByIndex(++i);
+                    if(nextDevice!=NULL)
                         response += ",";
+                    targetDevice = nextDevice;
                 }
                 response += "]}";
                 httpResponse(response,200, "application/json");
@@ -1156,16 +1385,14 @@ bool restoreDeviceState() //This function is used to restore the devices state f
                 int deviceId = deviceObject["id"].as<int>();
                 int deviceState = deviceObject["state"].as<int>();
                 int devicePwmValue = deviceObject["pwmValue"].as<int>();
-                if(deviceId>=0 && deviceId<deviceCount)
+                device * targetDevice = devManager.getById(deviceId);
+                if(targetDevice!=NULL)
                 {
-                    if(devices[deviceId].state!=deviceState)
-                    {
-                        if(devices[deviceId].state==1&&deviceState==0)
-                            isServerSynced = false;  // Don't turn off the device if it is already on and sync the state with the server
-                        else if(devices[deviceId].state==0&&deviceState==1)
-                            devices[deviceId].on();
-                    }
-                    devices[deviceId].setPwmValue(devicePwmValue);
+                    targetDevice->setPwmValue(devicePwmValue);
+                    if(targetDevice->state != targetDevice->initState) //If any changes in device state made by the user after booting 
+                        isServerSynced = false;
+                    else
+                        targetDevice->setState(deviceState);
                 }
             }
             Serial.println("Device State Restored");
@@ -1190,11 +1417,15 @@ bool restoreDeviceState() //This function is used to restore the devices state f
 bool storeDeviceState() //This function is used to store the devices state to the server or NVS
 {
     String deviceState = "";
-    for(int i=0;i<deviceCount;i++)
+    int i = 0;
+    device * targetDevice = devManager.getByIndex(i);
+    while(targetDevice!=NULL)
     {
-        deviceState += String(devices[i].id)+":"+String(devices[i].state)+":"+String(devices[i].pwmValue);
-        if(i<deviceCount-1)
+        deviceState += String(targetDevice->id)+":"+String(targetDevice->state)+":"+String(targetDevice->pwmValue);
+        device * nextDevice = devManager.getByIndex(++i);
+        if(nextDevice!=NULL)
             deviceState += ",";
+        targetDevice = nextDevice;
     }
     httpResponse_t response = httpRequest(SERVER_API,"POST","apiKey="+API_KEY+"&nodeId="+NODE_ID+"&action=storeState&deviceState="+deviceState,"application/x-www-form-urlencoded","",1000);
     if(response.code!=200)
@@ -1248,14 +1479,6 @@ bool storeDeviceState() //This function is used to store the devices state to th
 // ---------------------------
 
 
-void powerOffAllDevices() //This function is used to power off all the devices
-{
-    for(int i=0;i<deviceCount;i++)
-    {
-        if(devices[i].isEnable)
-            devices[i].off();
-    }
-}
 
 void switchHandle() //This function is used to handle the switch inputs
 {

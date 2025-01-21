@@ -32,8 +32,6 @@
 #define WEBSERVER_PORT 80 //Web Server Port 
 #define DHT_TYPE DHT11 //DHT Sensor Type
 
-#define PWM_MAX_VALUE 255  //PWM Max Value
-#define PWM_MIN_VALUE 0 //PWM Min Value
 
 #define SYNCRONIZE true //Auto Sync Device State with the server
 #define SYNCRONIZE_FAILED_LIMIT 50 //Max Failed Limit for Auto Sync: If the device state sync with the server failed more than this limit, the auto sync will be disabled
