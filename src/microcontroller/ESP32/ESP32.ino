@@ -978,6 +978,10 @@ bool turnOnMDNS()
     else
     {
         Serial.println("mDNS Started[Hostname: "+String(HOSTNAME)+"]");
+        MDNS.addService("weblume", "tcp", 80);
+        MDNS.addServiceTxt("weblume", "tcp", "version", VERSION);
+        MDNS.addServiceTxt("weblume","tcp","id",ID);
+        MDNS.addServiceTxt("weblume","tcp","mac",WiFi.macAddress());
         return true;
     }
 }
