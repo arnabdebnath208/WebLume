@@ -14,6 +14,7 @@
 #include "device.h"
 
 
+#define PREFERENCES_NAME NAME
 
 bool AUTO_SYNCRONIZE = SYNCRONIZE;
 int deviceStateSyncFailedCount = 0;
@@ -912,7 +913,7 @@ void handelApi()
         else if(server.hasArg("configGet")) // Get the config value
         {
             String configGet = server.arg("configGet");
-            preferences.begin("config", true);
+            preferences.begin(PREFERENCES_NAME, true);
             if(preferences.isKey(configGet.c_str()))
             {
                 String response = "{\"status\":\"success\",\""+configGet+"\":\""+preferences.getString(configGet.c_str(),"")+"\"}";
@@ -931,7 +932,7 @@ void handelApi()
         {
             String configSet = server.arg("configSet");
             // Cheak if the config key is valid
-            preferences.begin("config", false);
+            preferences.begin(PREFERENCES_NAME, false);
             if(preferences.isKey(configSet.c_str()))
             {
                 if(server.hasArg("value"))
@@ -1032,8 +1033,30 @@ void otaInit()
     ArduinoOTA.setPort(OTA_PORT.toInt());
     ArduinoOTA.setHostname(HOSTNAME.c_str());
     ArduinoOTA.setPassword(OTA_PASSWORD.c_str());
+    ArduinoOTA.onStart([]() {
+        String type;
+        if (ArduinoOTA.getCommand() == U_FLASH)
+            type = "sketch";
+        else // U_SPIFFS
+            type = "filesystem";
+        Serial.println("Start OTA updating " + type);
+    });
+    ArduinoOTA.onEnd([]() {
+        Serial.println("\nUpdate Complete");
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
     ArduinoOTA.begin();
-    Serial.println("Over The Air updates is turned on");
+    Serial.println("OTA Initialized");
     isOTAInit = true;
 }
 void otaHandle()
@@ -1231,7 +1254,7 @@ void toggleWiFiMode()
 // Config Functions
 bool loadConfig() // Load Config: Load presaved config to variables from NVS
 {
-    preferences.begin("config", true);
+    preferences.begin(PREFERENCES_NAME, true);
     configExists = preferences.getInt("exists",0);
     if(configExists==1)
     {
@@ -1242,7 +1265,7 @@ bool loadConfig() // Load Config: Load presaved config to variables from NVS
             Serial.println("Version Changed from "+preferences.getString("VERSION","NOVERSION")+" to "+VERSION);
             preferences.end();
             saveNewConfig();
-            preferences.begin("config", true);
+            preferences.begin(PREFERENCES_NAME, true);
         }
         WIFI_SSID = preferences.getString("WIFI_SSID",DEFAULT_WIFI_SSID);
         WIFI_PASSWORD = preferences.getString("WIFI_PASSWORD",DEFAULT_WIFI_PASSWORD);
@@ -1275,7 +1298,7 @@ bool loadConfig() // Load Config: Load presaved config to variables from NVS
 }
 void saveDefaultConfig() // Save Default Config: Save the default config to NVS
 {
-    preferences.begin("config", false);
+    preferences.begin(PREFERENCES_NAME, false);
     preferences.putInt("exists",1);
     preferences.putString("VERSION",VERSION);
     preferences.putString("WIFI_SSID",WIFI_SSID);
@@ -1296,7 +1319,7 @@ void saveDefaultConfig() // Save Default Config: Save the default config to NVS
 void saveNewConfig() // Save New Config which was not saved before
 {
     Serial.println("Saving New Configurations");
-    preferences.begin("config", false);
+    preferences.begin(PREFERENCES_NAME, false);
     preferences.putInt("exists",1);
     preferences.putString("VERSION",VERSION);
     if(!preferences.isKey("WIFI_SSID"))
@@ -1328,7 +1351,7 @@ void saveNewConfig() // Save New Config which was not saved before
 }
 void resetDevice() // Reset Device: Reset the device config to default
 {
-    preferences.begin("config", false);
+    preferences.begin(PREFERENCES_NAME, false);
     preferences.clear();
     preferences.end();
     Serial.println("Device Reseted");
