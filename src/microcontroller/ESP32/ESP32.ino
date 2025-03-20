@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
@@ -48,11 +49,11 @@ Preferences preferences;
 WebServer server(WEBSERVER_PORT);
 DHT dht(DHT_PIN,DHT_TYPE);
 
-void indicate(int onDuration,int offDuration,uint8_t indicatorDevicePin,bool isInverted);
+void indicate(int onDuration=150,int offDuration=150,uint8_t indicatorDevicePin = INDICATOR_LED,bool isInverted=false);
 void pinIOManager();
-httpResponse_t httpRequest(String url, String requestMethod, String data, String contentType, String cookie,int timeout);
+httpResponse_t httpRequest(String url, String requestMethod, String data, String contentType = "application/x-www-form-urlencoded", String cookie = "",int timeout = 3000);
 bool isAuthenticated();
-void httpResponse(String response,int code,String type);
+void httpResponse(String response,int code=200,String type="text/plain");
 void handelRoot();
 void handelApi();
 void otaInit();
@@ -204,7 +205,7 @@ void loop()
 
 
 
-void indicate(int onDuration=150,int offDuration=150,uint8_t indicatorDevicePin = INDICATOR_LED,bool isInverted=false)
+void indicate(int onDuration,int offDuration,uint8_t indicatorDevicePin,bool isInverted)
 {
     if(isInverted)
     {    
@@ -233,7 +234,7 @@ void pinIOManager()
 
 
 
-httpResponse_t httpRequest(String url, String requestMethod, String data, String contentType = "application/x-www-form-urlencoded", String cookie = "",int timeout = 3000)//This function is used to make http request
+httpResponse_t httpRequest(String url, String requestMethod, String data, String contentType, String cookie,int timeout)//This function is used to make http request
 {
     // Cheak for network connection type
     WiFiClient client;
@@ -281,7 +282,7 @@ bool isAuthenticated() // Check if the request is authenticated
         return false;
 }
 
-void httpResponse(String response,int code=200,String type="text/plain")
+void httpResponse(String response,int code,String type)
 {
     server.send(code,type,response);
     indicate(25,25,NETWORK_INDICATOR_LED);
