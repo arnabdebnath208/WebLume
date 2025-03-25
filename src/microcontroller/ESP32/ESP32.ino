@@ -13,6 +13,7 @@
 #include "pinConfig.h"
 #include "devInfo.h"
 #include "device.h"
+#include "intervalTask.h"
 
 
 #define PREFERENCES_NAME NAME
@@ -103,12 +104,14 @@ inputSwitch inputSwitches[] = {
 };
 int inputSwitchCount = sizeof(inputSwitches)/sizeof(inputSwitch);
 
-// intervalTask(int interval[Millisecond],void (*function)()=NULL,char * name="\0",bool isEnable=true) 
+// intervalTask(unsigned int id,unsigned int intervalMillis,void (*callbackFunction)() = NULL,const char * name = "",bool isEnable=true,bool isSilent=false);
 intervalTask intervalTasks[] = {
-    intervalTask{60000,dht11Read,"DHT11 Sensor Data Read"},
-    intervalTask{30000,[](){if(WiFi.status()==WL_CONNECTED&&AUTO_SYNCRONIZE&&SERVER_API!=""&&isSyncWithServerDone&&!isSyncTheServerDone)storeDeviceState();},"Sync Server With Device State"}, // It will cheak every 30 seconds if any device state is changed and sync with the server
+    intervalTask{0,60000,dht11Read,"DHT11 Sensor Data Read"},
+    intervalTask{1,30000,[](){if(WiFi.status()==WL_CONNECTED&&AUTO_SYNCRONIZE&&SERVER_API!=""&&isSyncWithServerDone&&!isSyncTheServerDone)storeDeviceState();},"Sync Server With Device State"}, // It will cheak every 30 seconds if any device state is changed and sync with the server
 };
 int intervalTaskCount = sizeof(intervalTasks)/sizeof(intervalTask);
+
+intervalTaskManager intervalTskManager(intervalTasks,intervalTaskCount);
 
 // irInput(uint32_t value,void (*singlePressFunction)()=NULL,char * name="\0",bool isEnable=true);
 irInput irInputs[] = {
@@ -199,7 +202,7 @@ void loop()
     }
 
     irReciveHandle(); // Handle IR Single Recive
-    intervalHandle(); // Handle Interval tasks
+    intervalTskManager.handle(); // Handle Interval tasks
     switchHandle(); // Handle Switch input tasks
 }
 
@@ -1556,22 +1559,6 @@ void switchHandle() //This function is used to handle the switch inputs
                     inputSwitches[i].singlePressFunction();
                 }
             }
-        }
-    }
-}
-
-void intervalHandle() //This function is used to handle the interval tasks
-{
-    for(int i=0;i<intervalTaskCount;i++)
-    {
-        if(intervalTasks[i].isEnable==false)
-            continue;
-        if(millis()-intervalTasks[i].lastTime>=intervalTasks[i].interval)
-        {
-            intervalTasks[i].lastTime = millis();
-            Serial.println(String(intervalTasks[i].name)+" Interval Task Triggered");
-            if(intervalTasks[i].function!=NULL)
-                intervalTasks[i].function();
         }
     }
 }

@@ -28,23 +28,6 @@ typedef struct input_switch_struct
     }
 } inputSwitch;
 
-typedef struct interval_task_struct
-{
-    int long interval; //The interval in milliseconds
-    void (*function)(); //The function to call after the interval
-    bool isEnable; //Enable/Disable the interval task
-    const char * name; //The name of the interval task [for debugging]
-    unsigned long lastTime=0; //Internal variable to store the last time the function was called
-
-    interval_task_struct(int interval,void (*function)()=NULL,char * name="\0",bool isEnable=true)
-    {
-        this->interval = interval;
-        this->function = function;
-        this->name = name;
-        this->isEnable = isEnable;
-    }
-} intervalTask;
-
 typedef struct http_response_struct
 {
     int code; //The HTTP response code
