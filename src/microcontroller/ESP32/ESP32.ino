@@ -65,12 +65,12 @@ void irReciveHandle();
 bool turnOnMDNS();
 bool turnOnWebServer();
 void dht11Read();
-void turnOnWiFi();
-void turnOffWiFi();
-void turnOnAP();
-void turnOffAP();
-void toggleAPMode();
-void toggleWiFiMode();
+void turnOnWiFi(bool wait=true);
+void turnOffWiFi(bool wait=true);
+void turnOnAP(bool wait=true);
+void turnOffAP(bool wait=true);
+void toggleAPMode(bool wait=true);
+void toggleWiFiMode(bool wait=true);
 bool loadConfig();
 void saveDefaultConfig();
 void resetDevice();
@@ -99,7 +99,7 @@ deviceManager devManager(devices,deviceCount);
 
 // inputSwitch(int pin,int triggerState,int longPressTime,void (*singlePressFunction)()=NULL,void (*longPressFunction)()=NULL,char * name="\0",bool isEnable=true)
 inputSwitch inputSwitches[] = {
-    inputSwitch(AP_TOOGLE_SWITCH,HIGH,2000,NULL,toggleAPMode,"AP Mode Switch"), //Long Press for 2 seconds to toggle AP mode
+    inputSwitch(AP_TOOGLE_SWITCH,HIGH,2000,NULL,[](){toggleAPMode();},"AP Mode Switch"), //Long Press for 2 seconds to toggle AP mode
     inputSwitch(CONFIG_RESET_SWITCH,LOW,3000,NULL,resetDevice,"Config Reset Switch") //Long Press for 3 seconds to reset the device configuration to default
 };
 int inputSwitchCount = sizeof(inputSwitches)/sizeof(inputSwitch);
@@ -147,9 +147,9 @@ void setup()
     // IrSender.begin(IR_SEND_PIN);
 
     if(NETWORK_MODE == "AP")
-        turnOnAP();
+        turnOnAP(false);
     else if(NETWORK_MODE == "STA" || NETWORK_MODE == "WIFI") //if NETWORK_MODE is STA or WIFI then turn on WiFi
-        turnOnWiFi();
+        turnOnWiFi(false);
     else
         Serial.println("No Network Mode is defined");
 
@@ -1108,13 +1108,13 @@ void irReciveHandle()
 
 
 // Network Functions 
-void turnOnWiFi()
+void turnOnWiFi(bool wait)
 {
     Serial.println("Turning on WiFi");
     if(AP)
     {
         Serial.println("Turning off AP to start WiFi");
-        turnOffAP();
+        turnOffAP(wait);
     }
     WiFi.mode(WIFI_STA);
     WIFI=true;
@@ -1129,25 +1129,28 @@ void turnOnWiFi()
         WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
         WiFi.setHostname(HOSTNAME.c_str());
         Serial.print("Connecting to "+WIFI_SSID+" ");
-        for(uint8_t i=0;i<10;i++)
+        if(wait)
         {
-            if(WiFi.status()==WL_CONNECTED)
+            for(uint8_t i=0;i<10;i++)
             {
-                Serial.println();
-                Serial.println("WiFi Connected");
-                Serial.println("WIFI SSID: "+WIFI_SSID);
-                Serial.println("RSSI: "+String(WiFi.RSSI())+" dBm");
-                Serial.println("IP Address: "+WiFi.localIP().toString());
-                Serial.println("MAC Address: "+WiFi.macAddress());
-                isWiFiConnected=true;
+                if(WiFi.status()==WL_CONNECTED)
+                {
+                    Serial.println();
+                    Serial.println("WiFi Connected");
+                    Serial.println("WIFI SSID: "+WIFI_SSID);
+                    Serial.println("RSSI: "+String(WiFi.RSSI())+" dBm");
+                    Serial.println("IP Address: "+WiFi.localIP().toString());
+                    Serial.println("MAC Address: "+WiFi.macAddress());
+                    isWiFiConnected=true;
+                    digitalWrite(NETWORK_INDICATOR_LED,LOW);
+                    break;
+                }
+                digitalWrite(NETWORK_INDICATOR_LED,HIGH);
+                delay(250);
                 digitalWrite(NETWORK_INDICATOR_LED,LOW);
-                break;
+                delay(250);
+                Serial.print(".");
             }
-            digitalWrite(NETWORK_INDICATOR_LED,HIGH);
-            delay(250);
-            digitalWrite(NETWORK_INDICATOR_LED,LOW);
-            delay(250);
-            Serial.print(".");
         }
         Serial.println();
         isWiFiConnected=false;
@@ -1155,7 +1158,7 @@ void turnOnWiFi()
         // WiFi.setSleep(WIFI_PS_NONE);
     }
 }
-void turnOffWiFi()
+void turnOffWiFi(bool wait)
 {
     if(AP)
     {
@@ -1172,8 +1175,11 @@ void turnOffWiFi()
     {
         Serial.println("Disconnecting from WiFi");
         WiFi.disconnect(true);
-        indicate(250,250,NETWORK_INDICATOR_LED);
-        indicate(250,250,NETWORK_INDICATOR_LED);
+        if(wait)
+        {
+            indicate(250,250,NETWORK_INDICATOR_LED);
+            indicate(250,250,NETWORK_INDICATOR_LED);
+        }
         WiFi.mode(WIFI_OFF);
         WIFI=false;
         AP_WIFI_OVERRIDED = false;
@@ -1181,19 +1187,22 @@ void turnOffWiFi()
         digitalWrite(NETWORK_INDICATOR_LED,LOW);
     }
 }
-void turnOnAP()
+void turnOnAP(bool wait)
 {
     if(WIFI)
     {
         Serial.println("Turning off WiFi to start AP");
-        turnOffWiFi();
+        turnOffWiFi(wait);
         AP_WIFI_OVERRIDED = true;
     }
-    indicate(100,100,NETWORK_INDICATOR_LED);
-    indicate(100,100,NETWORK_INDICATOR_LED);
-    indicate(100,100,NETWORK_INDICATOR_LED);
-    indicate(100,100,NETWORK_INDICATOR_LED);
-    indicate(100,100,NETWORK_INDICATOR_LED);
+    if(wait)
+    {
+        indicate(100,100,NETWORK_INDICATOR_LED);
+        indicate(100,100,NETWORK_INDICATOR_LED);
+        indicate(100,100,NETWORK_INDICATOR_LED);
+        indicate(100,100,NETWORK_INDICATOR_LED);
+        indicate(100,100,NETWORK_INDICATOR_LED);
+    }
     Serial.println("Turning on AP Mode");
     WiFi.mode(WIFI_AP);
     if(AP_PASSWORD!="")
@@ -1206,50 +1215,55 @@ void turnOnAP()
     Serial.println("Password: "+String(AP_PASSWORD));
     Serial.println("IP Address: "+WiFi.softAPIP().toString());
     Serial.println("MAC Address: "+WiFi.softAPmacAddress());
-    delay(1000);
+    if(wait)
+        delay(1000);
 }
-void turnOffAP()
+void turnOffAP(bool wait)
 {
     WiFi.mode(WIFI_OFF);
-    indicate(200,200,NETWORK_INDICATOR_LED);
-    indicate(200,200,NETWORK_INDICATOR_LED);
+    if(wait)
+    {
+        indicate(200,200,NETWORK_INDICATOR_LED);
+        indicate(200,200,NETWORK_INDICATOR_LED);
+    }
     AP = false;
     Serial.println("AP Mode Stopped");
     if(AP_WIFI_OVERRIDED)
     {
         AP_WIFI_OVERRIDED = false;
         Serial.println("Restoring WiFi");
-        turnOnWiFi();
+        turnOnWiFi(wait);
     }
-    delay(1000);
+    if(wait)
+        delay(1000);
 }
-void toggleAPMode()
+void toggleAPMode(bool wait)
 {
     Serial.println("AP Mode Toggle");
     if(AP)
     {
         Serial.println("AP Mode was on");
-        turnOffAP();
+        turnOffAP(wait);
     }
     else
     {
         Serial.println("AP Mode was off");
-        turnOnAP();
+        turnOnAP(wait);
     }
 }
-void toggleWiFiMode()
+void toggleWiFiMode(bool wait)
 {
     if(WIFI)
     {
         Serial.println("Turning off WiFi");
-        turnOffWiFi();
+        turnOffWiFi(wait);
     }
     else
     {
         Serial.println("Turing on WiFi");
         if(AP)
-            turnOffAP();
-        turnOnWiFi();
+            turnOffAP(wait);
+        turnOnWiFi(wait);
     }
 }
 // ----------------
